@@ -1,4 +1,7 @@
-﻿using System.Diagnostics;
+﻿using H3_SymmetricEncryption.Algorithms;
+using H3_SymmetricEncryption.Interfaces;
+using H3_SymmetricEncryption.Services;
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -8,88 +11,31 @@ namespace H3_SymmetricEncryption
     {
         static void Main(string[] args)
         {
+            // Display available algorithms
             Console.WriteLine("Choose an encryption algorithm:");
             Console.WriteLine("1: DES");
             Console.WriteLine("2: 3DES");
             Console.WriteLine("3: AES (Rijndael)");
 
-            string choice = Console.ReadLine();
-            SymmetricAlgorithm algorithm = choice switch
+            // Get the user's choice
+            ConsoleKey choice = Console.ReadKey(intercept: true).Key;
+            IEncryptionAlgorithm algorithm = choice switch
             {
-                "1" => DES.Create(),
-                "2" => TripleDES.Create(),
-                "3" => Aes.Create(),
+                ConsoleKey.D1 => new DesEncryptionAlgorithm(),
+                ConsoleKey.D2 => new TripleDesEncryptionAlgorithm(),
+                ConsoleKey.D3 => new AesEncryptionAlgorithm(),
                 _ => throw new Exception("Invalid choice")
             };
 
-            Console.WriteLine($"You selected: {algorithm.GetType().Name}");
-
-            byte[] key = new byte[algorithm.KeySize / 8];
-            byte[] iv = new byte[algorithm.BlockSize / 8];
-
-            RandomNumberGenerator.Fill(key);
-            RandomNumberGenerator.Fill(iv);
-
+            Console.Clear();
+            Console.WriteLine($"You selected: {algorithm.AlgorithmName}");
             Console.Write("Enter a message to encrypt: ");
+
             string plaintext = Console.ReadLine();
 
-            Stopwatch stopwatch = Stopwatch.StartNew();
-            byte[] encrypted = Encrypt(plaintext, algorithm, key, iv);
-            stopwatch.Stop();
-            Console.WriteLine($"Encryption Time: {stopwatch.ElapsedMilliseconds} ms");
-
-            stopwatch.Restart();
-            string decrypted = Decrypt(encrypted, algorithm, key, iv);
-            stopwatch.Stop();
-            Console.WriteLine($"Decryption Time: {stopwatch.ElapsedMilliseconds} ms");
-
-            Console.WriteLine("\n--- RESULTS ---");
-            Console.WriteLine($"Plaintext (ASCII): {plaintext}");
-            Console.WriteLine($"Plaintext (HEX): {ToHex(Encoding.ASCII.GetBytes(plaintext))}");
-            Console.WriteLine($"Ciphertext (ASCII): {ToAscii(encrypted)}");
-            Console.WriteLine($"Ciphertext (HEX): {ToHex(encrypted)}");
-            Console.WriteLine($"Key (HEX): {ToHex(key)}");
-            Console.WriteLine($"IV (HEX): {ToHex(iv)}");
-
+            // Process the encryption and the decryption and display results
+            EncryptionService encryptionService = new EncryptionService(algorithm);
+            encryptionService.ProcessEncryption(plaintext);
         }
-
-        static byte[] Encrypt(string plaintext, SymmetricAlgorithm algorithm, byte[] key, byte[] iv)
-        {
-            algorithm.Key = key;
-            algorithm.IV = iv;
-
-            using (ICryptoTransform encryptor = algorithm.CreateEncryptor())
-            using (MemoryStream msEncrypt = new MemoryStream())
-            using (CryptoStream csEncrypt = new CryptoStream(msEncrypt, encryptor, CryptoStreamMode.Write))
-            using (StreamWriter swEncrypt = new StreamWriter(csEncrypt))
-            {
-                swEncrypt.Write(plaintext);
-                swEncrypt.Close();
-                return msEncrypt.ToArray();
-            }
-        }
-
-        static string Decrypt(byte[] ciphertext, SymmetricAlgorithm algorithm, byte[] key, byte[] iv)
-        {
-            algorithm.Key = key;
-            algorithm.IV = iv;
-
-            using (ICryptoTransform decryptor = algorithm.CreateDecryptor())
-            using (MemoryStream msDecrypt = new MemoryStream(ciphertext))
-            using (CryptoStream csDecrypt = new CryptoStream(msDecrypt, decryptor, CryptoStreamMode.Read))
-            using (StreamReader srDecrypt = new StreamReader(csDecrypt))
-            {
-                return srDecrypt.ReadToEnd();
-            }
-        }
-
-        static string ToHex(byte[] data) => BitConverter.ToString(data).Replace("-", " ");
-
-        static string ToAscii(byte[] data)
-        {
-            string asciiString = Encoding.ASCII.GetString(data);
-            return asciiString.Replace("\r", "\\r").Replace("\n", "\\n");
-        }
-
     }
 }
